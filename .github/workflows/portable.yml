@@ -27,6 +27,21 @@ jobs:
             & "$testDir/test_portable_storage.exe"
             if ($LASTEXITCODE) { throw 'Portable storage tests failed' }
           } finally { Pop-Location }
+      - name: Check first launch beside the executable
+        shell: pwsh
+        run: |
+          $testDir = Join-Path $env:RUNNER_TEMP 'USB 한글 경로'
+          Copy-Item build/windows/Release/putty.exe $testDir
+          $process = Start-Process "$testDir/putty.exe" -WorkingDirectory $env:WINDIR -PassThru
+          try {
+            Start-Sleep -Seconds 3
+            if ($process.HasExited) { throw 'PuTTY exited during first launch' }
+            if (!(Test-Path "$testDir/putty.ini")) { throw 'Settings were not created beside the executable' }
+            $null = $process.CloseMainWindow()
+            if (!$process.WaitForExit(5000)) { throw 'PuTTY did not close its configuration window' }
+          } finally {
+            if (!$process.HasExited) { Stop-Process -Id $process.Id -Force }
+          }
       - name: Verify no registry API imports and no compiler runtime DLL
         shell: pwsh
         run: |
@@ -57,9 +72,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'v0.85-portable.1'
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --target '${{ github.sha }}' --title 'PuTTY 0.85 Portable x64' --notes 'Windows x64 portable build. Settings and SSH trust data are saved in putty.ini beside putty.exe. Random seed stays in PUTTY.RND in the same folder. Configuration, Unicode paths, concurrent writes and registry API imports are checked by CI.' dist/putty.exe putty-portable-0.85-x64.zip dist/SHA256SUMS.txt
-            if ($LASTEXITCODE) { throw 'Release publication failed' }
+          $head = gh api 'repos/${{ github.repository }}/git/ref/heads/main' --jq '.object.sha'
+          if ($LASTEXITCODE) { throw 'Cannot check current main commit' }
+          if ($head -ne '${{ github.sha }}') {
+            Write-Host 'A newer commit is building; keep this build as an artifact.'
+            exit 0
           }
+          $revision = 1
+          while ($true) {
+            $tag = "v0.85-portable.$revision"
+            $target = gh release view $tag --json targetCommitish --jq '.targetCommitish' 2>$null
+            if ($LASTEXITCODE -ne 0) { break }
+            if ($target -eq '${{ github.sha }}') { exit 0 }
+            $revision++
+          }
+          gh release create $tag --target '${{ github.sha }}' --title "PuTTY 0.85 Portable x64 ($tag)" --notes 'Windows x64 portable build. Settings and SSH trust data are saved in putty.ini beside putty.exe. Random seed stays in PUTTY.RND in the same folder. Configuration, Unicode paths, concurrent writes, first GUI launch and registry API imports are checked by CI.' dist/putty.exe putty-portable-0.85-x64.zip dist/SHA256SUMS.txt
+          if ($LASTEXITCODE) { throw 'Release publication failed' }

@@ -1,0 +1,65 @@
+name: Windows portable build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure standalone x64 build
+        run: cmake -S . -B build -A x64 -DPUTTY_PORTABLE=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+      - name: Compile
+        run: cmake --build build --config Release --target putty test_portable_storage test_conf --parallel
+      - name: Test configuration and portable storage
+        shell: pwsh
+        run: |
+          & build/Release/test_conf.exe
+          if ($LASTEXITCODE) { throw 'Configuration tests failed' }
+          $testDir = Join-Path $env:RUNNER_TEMP 'USB 한글 경로'
+          New-Item -ItemType Directory -Force $testDir | Out-Null
+          Copy-Item build/windows/Release/test_portable_storage.exe $testDir
+          Push-Location $env:WINDIR
+          try {
+            & "$testDir/test_portable_storage.exe"
+            if ($LASTEXITCODE) { throw 'Portable storage tests failed' }
+          } finally { Pop-Location }
+      - name: Verify no registry API imports and no compiler runtime DLL
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -property installationPath
+          $dumpbin = Get-ChildItem "$vs/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe" | Select-Object -Last 1
+          $imports = & $dumpbin.FullName /imports build/windows/Release/putty.exe
+          if ($LASTEXITCODE) { throw 'Cannot inspect executable imports' }
+          if ($imports -match '\bReg(Open|Create|Query|Set|Delete|Enum|Close|Get|Load|Save)\w*') { throw 'Registry API import found' }
+          if ($imports -match '(?i)(vcruntime|msvcp|libgcc|libwinpthread).*\.dll') { throw 'Non-system runtime DLL found' }
+          $imports | Set-Content build/imports.txt
+      - name: Package executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/windows/Release/putty.exe dist/putty.exe
+          Copy-Item LICENCE, PORTABLE.md dist
+          (Get-FileHash dist/putty.exe -Algorithm SHA256).Hash.ToLower() + '  putty.exe' | Set-Content dist/SHA256SUMS.txt
+          Compress-Archive -Path dist/* -DestinationPath putty-portable-0.85-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: putty-portable-0.85-x64
+          path: |
+            dist/*
+            putty-portable-0.85-x64.zip
+            build/imports.txt
+      - name: Tag and publish tested build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = 'v0.85-portable.1'
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target '${{ github.sha }}' --title 'PuTTY 0.85 Portable x64' --notes 'Windows x64 portable build. Settings and SSH trust data are saved in putty.ini beside putty.exe. Random seed stays in PUTTY.RND in the same folder. Configuration, Unicode paths, concurrent writes and registry API imports are checked by CI.' dist/putty.exe putty-portable-0.85-x64.zip dist/SHA256SUMS.txt
+            if ($LASTEXITCODE) { throw 'Release publication failed' }
+          }

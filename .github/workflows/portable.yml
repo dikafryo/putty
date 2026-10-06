@@ -21,7 +21,7 @@ jobs:
           if ($LASTEXITCODE) { throw 'Configuration tests failed' }
           $testDir = Join-Path $env:RUNNER_TEMP 'USB 한글 경로'
           New-Item -ItemType Directory -Force $testDir | Out-Null
-          Copy-Item build/windows/Release/test_portable_storage.exe $testDir
+          Copy-Item build/Release/test_portable_storage.exe $testDir
           Push-Location $env:WINDIR
           try {
             & "$testDir/test_portable_storage.exe"
@@ -31,7 +31,7 @@ jobs:
         shell: pwsh
         run: |
           $testDir = Join-Path $env:RUNNER_TEMP 'USB 한글 경로'
-          Copy-Item build/windows/Release/putty.exe $testDir
+          Copy-Item build/Release/putty.exe $testDir
           $process = Start-Process "$testDir/putty.exe" -WorkingDirectory $env:WINDIR -PassThru
           try {
             Start-Sleep -Seconds 3
@@ -47,7 +47,7 @@ jobs:
         run: |
           $vs = & "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -property installationPath
           $dumpbin = Get-ChildItem "$vs/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe" | Select-Object -Last 1
-          $imports = & $dumpbin.FullName /imports build/windows/Release/putty.exe
+          $imports = & $dumpbin.FullName /imports build/Release/putty.exe
           if ($LASTEXITCODE) { throw 'Cannot inspect executable imports' }
           if ($imports -match '\bReg(Open|Create|Query|Set|Delete|Enum|Close|Get|Load|Save)\w*') { throw 'Registry API import found' }
           if ($imports -match '(?i)(vcruntime|msvcp|libgcc|libwinpthread).*\.dll') { throw 'Non-system runtime DLL found' }
@@ -56,7 +56,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item build/windows/Release/putty.exe dist/putty.exe
+          Copy-Item build/Release/putty.exe dist/putty.exe
           Copy-Item LICENCE, PORTABLE.md dist
           (Get-FileHash dist/putty.exe -Algorithm SHA256).Hash.ToLower() + '  putty.exe' | Set-Content dist/SHA256SUMS.txt
           Compress-Archive -Path dist/* -DestinationPath putty-portable-0.85-x64.zip

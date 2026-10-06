@@ -34,7 +34,7 @@ wchar_t *portable_path(const wchar_t *filename)
         path = sresize(path, capacity, wchar_t);
         DWORD length = GetModuleFileNameW(NULL, path, capacity);
         if (!length)
-            fatalbox("Cannot locate the portable executable: %s",
+            modalfatalbox("Cannot locate the portable executable: %s",
                      win_strerror(GetLastError()));
         if (length < capacity - 1)
             break;
@@ -42,7 +42,7 @@ wchar_t *portable_path(const wchar_t *filename)
     }
     wchar_t *slash = wcsrchr(path, L'\\');
     if (!slash)
-        fatalbox("The portable executable path has no directory");
+        modalfatalbox("The portable executable path has no directory");
     size_t prefix = slash + 1 - path;
     path = sresize(path, prefix + wcslen(filename) + 1, wchar_t);
     wcscpy(path + prefix, filename);

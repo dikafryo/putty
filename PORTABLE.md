@@ -33,10 +33,10 @@ Visual Studio 2022의 C++ 데스크톱 빌드 도구 및 CMake가 필요합니�
 cmake -S . -B build -A x64 -DPUTTY_PORTABLE=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 cmake --build build --config Release --target putty test_portable_storage test_conf --parallel
 .\build\Release\test_conf.exe
-.\build\windows\Release\test_portable_storage.exe
+.\build\Release\test_portable_storage.exe
 ```
 
-실행파일: `build/windows/Release/putty.exe`.
+실행파일: `build/Release/putty.exe`.
 저장 테스트는 테스트 실행파일 옆의 설정 파일을 삭제하므로 실제 사용자 설정과
 분리된 빌드 디렉토리에서 실행하세요.
 

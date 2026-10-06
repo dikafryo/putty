@@ -43,9 +43,9 @@ void portable_storage_init(void)
     char *error;
     portable_db *db = portable_db_open(true, &error);
     if (!db)
-        fatalbox("%s", error);
+        modalfatalbox("%s", error);
     if (!portable_db_close(db, &error))
-        fatalbox("%s", error);
+        modalfatalbox("%s", error);
 }
 
 settings_w *open_settings_w(const char *name, char **error)

@@ -20,14 +20,6 @@ static void report_error(const char *format, va_list args)
     exit(1);
 }
 
-void fatalbox(const char *format, ...)
-{
-    va_list args;
-    va_start(args, format);
-    report_error(format, args);
-    va_end(args);
-}
-
 void modalfatalbox(const char *format, ...)
 {
     va_list args;
@@ -63,19 +55,14 @@ static void test_settings(void)
     char *error;
     settings_w *writer = open_settings_w(name, &error);
     CHECK(writer && !error);
-    puts("Saving string settings");
     write_setting_s(writer, "Escaped=Key", text);
     write_setting_s(writer, "Large", large);
     write_setting_i(writer, "Signed", INT_MIN);
-    puts("Saving font settings");
     FontSpec *font = fontspec_new("Consolas", true, 13, 1);
     write_setting_fontspec(writer, "Font", font);
-    puts("Saving Unicode filename");
     Filename *filename = filename_from_wstr(L"Z:\\USB\\\xD55C\xAE00\\key.ppk");
     write_setting_filename(writer, "KeyFile", filename);
-    puts("Committing settings file");
     close_settings_w(writer);
-    puts("Loading settings file");
     settings_r *reader = open_settings_r(name);
     CHECK(reader);
     char *loaded = read_setting_s(reader, "Escaped=Key");
@@ -86,21 +73,17 @@ static void test_settings(void)
     sfree(loaded);
     CHECK(read_setting_i(reader, "Signed", 0) == INT_MIN);
     CHECK(read_setting_i(reader, "Missing", 123) == 123);
-    puts("Loading font settings");
     FontSpec *loaded_font = read_setting_fontspec(reader, "Font");
     CHECK(loaded_font && loaded_font->isbold && loaded_font->height == 13);
     CHECK(!strcmp(loaded_font->name, font->name));
     fontspec_free(loaded_font);
     fontspec_free(font);
-    puts("Loading Unicode filename");
     Filename *loaded_filename = read_setting_filename(reader, "KeyFile");
     CHECK(loaded_filename && !wcscmp(loaded_filename->wpath, filename->wpath));
     filename_free(loaded_filename);
     filename_free(filename);
-    puts("Closing settings reader");
     close_settings_r(reader);
     sfree(large);
-    puts("Enumerating settings");
     settings_e *enumerator = enum_settings_start();
     strbuf *entry = strbuf_new();
     bool found = false;
@@ -112,7 +95,6 @@ static void test_settings(void)
     CHECK(found);
     enum_settings_finish(enumerator);
     strbuf_free(entry);
-    puts("Deleting saved settings");
     del_settings(name);
     CHECK(!open_settings_r(name));
     save_session("Default Settings");

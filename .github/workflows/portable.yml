@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure standalone x64 build
-        run: cmake -S . -B build -A x64 -DPUTTY_PORTABLE=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded "-DCMAKE_C_FLAGS=/MP /WX"
+        run: cmake -S . -B build -A x64 -DPUTTY_PORTABLE=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DCMAKE_C_FLAGS=/MP
       - name: Compile
         run: cmake --build build --config Release --target putty test_portable_storage test_conf --parallel
       - name: Test configuration and portable storage

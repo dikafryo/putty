@@ -219,6 +219,12 @@ if(PUTTY_PORTABLE)
   add_executable(test_portable_storage
     ${CMAKE_SOURCE_DIR}/test/test_portable_storage.c)
   target_link_libraries(test_portable_storage settings utils ${platform_libraries})
+  if(MSVC)
+    # Keep warning failures on production/test code, outside SDK feature probes.
+    foreach(target settings putty test_portable_storage)
+      target_compile_options(${target} PRIVATE /WX)
+    endforeach()
+  endif()
   enable_testing()
   add_test(NAME portable_storage COMMAND test_portable_storage)
 endif()

@@ -11,6 +11,7 @@ const char *portable_db_get(portable_db *db, const char *section,
 void portable_db_set(portable_db *db, const char *section,
                      const char *key, const char *value);
 void portable_db_delete(portable_db *db, const char *section);
+bool portable_db_remove_file(portable_db *db, char **error);
 char *portable_db_enum(portable_db *db, const char *prefix, int index);
 void portable_storage_init(void);
 #endif

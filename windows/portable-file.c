@@ -7,6 +7,7 @@
  */
 #include <errno.h>
 #include <io.h>
+#include <fcntl.h>
 #include <wchar.h>
 #include "putty.h"
 #include "tree234.h"
@@ -136,13 +137,26 @@ static void db_free(portable_db *db)
 
 static bool db_load(portable_db *db, char **error)
 {
-    FILE *input = _wfopen(db->path, L"rb");
-    if (!input) {
-        if (errno == ENOENT) {
+    HANDLE file = CreateFileW(db->path, GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE) {
+        DWORD code = GetLastError();
+        if (code == ERROR_FILE_NOT_FOUND) {
             db->dirty = true;
             return true;
         }
-        *error = dupprintf("Cannot read putty.ini: %s", strerror(errno));
+        *error = dupprintf("Cannot read putty.ini: %s", win_strerror(code));
+        return false;
+    }
+    int descriptor = _open_osfhandle((intptr_t)file, _O_RDONLY | _O_BINARY);
+    FILE *input = descriptor < 0 ? NULL : _fdopen(descriptor, "rb");
+    if (!input) {
+        if (descriptor < 0)
+            CloseHandle(file);
+        else
+            _close(descriptor);
+        *error = dupprintf("Cannot open putty.ini stream: %s", strerror(errno));
         return false;
     }
     char *section = NULL, *line;
@@ -272,4 +286,15 @@ bool portable_db_close(portable_db *db, char **error)
     bool success = !db->output || !db->dirty || db_save(db, error);
     db_free(db);
     return success;
+}
+
+/* Called with the writer lock held, so cleanup cannot race another save. */
+bool portable_db_remove_file(portable_db *db, char **error)
+{
+    db->dirty = false;
+    *error = NULL;
+    if (DeleteFileW(db->path) || GetLastError() == ERROR_FILE_NOT_FOUND)
+        return true;
+    *error = dupprintf("Cannot delete putty.ini: %s", win_strerror(GetLastError()));
+    return false;
 }

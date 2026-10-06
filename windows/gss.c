@@ -109,11 +109,13 @@ static bool library_is_in_never_unload_tree(HMODULE module)
     ensure_library_tree_exists();
     return find234(libraries_to_never_unload, module, NULL);
 }
+#ifndef PUTTY_PORTABLE
 static void add_library_to_never_unload_tree(HMODULE module)
 {
     ensure_library_tree_exists();
     add234(libraries_to_never_unload, module);
 }
+#endif
 
 struct ssh_gss_liblist *ssh_gss_setup(Conf *conf)
 {

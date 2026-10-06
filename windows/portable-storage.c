@@ -1,4 +1,5 @@
 /* Windows portable implementation of storage.h; no registry access. */
+#include <errno.h>
 #include <limits.h>
 #include "putty.h"
 #include "storage.h"
@@ -54,7 +55,8 @@ settings_w *open_settings_w(const char *name, char **error)
         return NULL;
     settings_w *handle = snew(settings_w);
     handle->db = db;
-    handle->section = named_section("Sessions/", name && *name ? name : "Default Settings");
+    handle->section = named_section(
+        "Sessions/", name && *name ? name : "Default Settings");
     portable_db_set(db, handle->section, "", "");
     return handle;
 }
@@ -86,7 +88,8 @@ settings_r *open_settings_r(const char *name)
     portable_db *db = read_db();
     if (!db)
         return NULL;
-    char *section = named_section("Sessions/", name && *name ? name : "Default Settings");
+    char *section = named_section(
+        "Sessions/", name && *name ? name : "Default Settings");
     if (!portable_db_get(db, section, "")) {
         close_db(db);
         sfree(section);
@@ -100,7 +103,8 @@ settings_r *open_settings_r(const char *name)
 
 char *read_setting_s(settings_r *handle, const char *key)
 {
-    const char *value = handle ? portable_db_get(handle->db, handle->section, key) : NULL;
+    const char *value = handle ?
+        portable_db_get(handle->db, handle->section, key) : NULL;
     return value ? dupstr(value) : NULL;
 }
 
@@ -111,13 +115,16 @@ static int db_read_int(portable_db *db, const char *section,
     if (!text || !*text)
         return fallback;
     char *end;
+    errno = 0;
     long value = strtol(text, &end, 10);
-    return *end || value < INT_MIN || value > INT_MAX ? fallback : (int)value;
+    return errno || *end || value < INT_MIN || value > INT_MAX ?
+        fallback : (int)value;
 }
 
 int read_setting_i(settings_r *handle, const char *key, int fallback)
 {
-    return handle ? db_read_int(handle->db, handle->section, key, fallback) : fallback;
+    return handle ?
+        db_read_int(handle->db, handle->section, key, fallback) : fallback;
 }
 
 FontSpec *read_setting_fontspec(settings_r *handle, const char *name)
@@ -334,9 +341,12 @@ host_ca *host_ca_load(const char *name)
         ca->name = dupstr(name);
         ca->ca_public_key = base64_decode_sb(ptrlen_from_asciz(public_key));
         ca->validity_expression = dupstr(validity);
-        ca->opts.permit_rsa_sha1 = db_read_int(db, section, "PermitRSASHA1", ca->opts.permit_rsa_sha1);
-        ca->opts.permit_rsa_sha256 = db_read_int(db, section, "PermitRSASHA256", ca->opts.permit_rsa_sha256);
-        ca->opts.permit_rsa_sha512 = db_read_int(db, section, "PermitRSASHA512", ca->opts.permit_rsa_sha512);
+        ca->opts.permit_rsa_sha1 = db_read_int(
+            db, section, "PermitRSASHA1", ca->opts.permit_rsa_sha1);
+        ca->opts.permit_rsa_sha256 = db_read_int(
+            db, section, "PermitRSASHA256", ca->opts.permit_rsa_sha256);
+        ca->opts.permit_rsa_sha512 = db_read_int(
+            db, section, "PermitRSASHA512", ca->opts.permit_rsa_sha512);
     }
     sfree(section);
     close_db(db);
@@ -408,11 +418,11 @@ void cleanup_all(void)
         sfree(error);
         return;
     }
-    wchar_t *path = portable_path(L"putty.ini");
-    if (!DeleteFileW(path) && GetLastError() != ERROR_FILE_NOT_FOUND)
-        nonfatal("Cannot delete putty.ini: %s", win_strerror(GetLastError()));
-    sfree(path);
-    path = portable_path(L"PUTTY.RND");
+    if (!portable_db_remove_file(db, &error)) {
+        nonfatal("%s", error);
+        sfree(error);
+    }
+    wchar_t *path = portable_path(L"PUTTY.RND");
     if (!DeleteFileW(path) && GetLastError() != ERROR_FILE_NOT_FOUND)
         nonfatal("Cannot delete PUTTY.RND: %s", win_strerror(GetLastError()));
     sfree(path);
